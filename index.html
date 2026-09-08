@@ -100,6 +100,12 @@ body {
   flex: 0 0 auto;
 }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .brand {
   font-family: 'Fraunces', Georgia, serif;
   font-weight: 600;
@@ -193,7 +199,7 @@ body {
 
 .month-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(20px, 1fr));
+  grid-template-columns: repeat(14, 1fr);
   gap: 5px;
   margin-bottom: 28px;
   flex: 0 0 auto;
@@ -511,17 +517,19 @@ h1.home-title {
 
 <div class="wrap" id="appWrap" hidden>
 
-  <div id="writeView">
-    <div class="topbar">
-      <button class="brand" id="brandFromWrite">500 Words Daily</button>
-      <div style="display:flex; align-items:center; gap:16px;">
-        <div class="streak-chip"><span class="dot"></span><span id="streakChip">0 day streak</span></div>
-        <div class="account-chip">
-          <img id="userAvatar" src="" alt="" hidden>
-          <button id="signOutBtnWrite">Sign out</button>
-        </div>
+  <div class="topbar">
+    <button class="brand" id="brandHome">500 Words Daily</button>
+    <div class="topbar-right">
+      <div class="streak-chip"><span class="dot"></span><span id="streakChip">0 day streak</span></div>
+      <button class="write-cta" id="writeTodayBtn">Write today &rarr;</button>
+      <div class="account-chip">
+        <img id="userAvatar" src="" alt="" hidden>
+        <button id="signOutBtn">Sign out</button>
       </div>
     </div>
+  </div>
+
+  <div id="writeView">
 
     <h1 class="entry-date" id="entryDateHeading">&nbsp;</h1>
 
@@ -542,15 +550,6 @@ h1.home-title {
   </div>
 
   <div id="homeView" hidden>
-    <div class="topbar">
-      <button class="brand" id="brandFromHome">500 Words Daily</button>
-      <div style="display:flex; align-items:center; gap:16px;">
-        <button class="write-cta" id="writeTodayBtn">Write today &rarr;</button>
-        <div class="account-chip">
-          <button id="signOutBtnHome">Sign out</button>
-        </div>
-      </div>
-    </div>
 
     <h1 class="home-title">Entries</h1>
 
@@ -651,9 +650,10 @@ h1.home-title {
   }
 
   // ---- view state ----
+  var STRIP_DAYS = 14;
   var view = 'write';           // 'write' | 'home'
   var viewingDate = todayId;    // date currently shown in the write canvas
-  var stripMonth = new Date();  // month currently shown in the month strip
+  var stripEnd = new Date();    // last day of the 14-day window currently shown
   var typing = false;
 
   var el = {
@@ -680,8 +680,7 @@ h1.home-title {
     googleSignInBtn: document.getElementById('googleSignInBtn'),
     loginError: document.getElementById('loginError'),
     userAvatar: document.getElementById('userAvatar'),
-    signOutBtnWrite: document.getElementById('signOutBtnWrite'),
-    signOutBtnHome: document.getElementById('signOutBtnHome')
+    signOutBtn: document.getElementById('signOutBtn')
   };
 
   function showView(next) {
@@ -692,39 +691,36 @@ h1.home-title {
 
   function openDate(id) {
     viewingDate = id;
-    stripMonth = parseId(id);
+    stripEnd = parseId(id);
     showView('write');
     renderCurrent();
     setTimeout(function () { el.box.focus(); }, 0);
   }
 
-  document.getElementById('brandFromWrite').addEventListener('click', function () { showView('home'); renderCurrent(); });
-  document.getElementById('brandFromHome').addEventListener('click', function () { openDate(todayId); });
+  document.getElementById('brandHome').addEventListener('click', function () { showView('home'); renderCurrent(); });
   document.getElementById('writeTodayBtn').addEventListener('click', function () { openDate(todayId); });
 
   el.prevMonth.addEventListener('click', function () {
-    stripMonth = new Date(stripMonth.getFullYear(), stripMonth.getMonth() - 1, 1);
+    stripEnd = new Date(stripEnd.getTime() - STRIP_DAYS * dayMs);
     renderMonthStrip(store.entries);
   });
   el.nextMonth.addEventListener('click', function () {
-    var next = new Date(stripMonth.getFullYear(), stripMonth.getMonth() + 1, 1);
-    if (next > new Date()) return;
-    stripMonth = next;
+    var next = new Date(stripEnd.getTime() + STRIP_DAYS * dayMs);
+    stripEnd = next > new Date() ? new Date() : next;
     renderMonthStrip(store.entries);
   });
 
   function renderMonthStrip(entries) {
-    var y = stripMonth.getFullYear(), m = stripMonth.getMonth();
-    el.monthLabel.textContent = stripMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
     var now = new Date();
-    var isCurrentMonth = (y === now.getFullYear() && m === now.getMonth());
-    el.nextMonth.disabled = isCurrentMonth;
+    var start = new Date(stripEnd.getTime() - (STRIP_DAYS - 1) * dayMs);
+    el.monthLabel.textContent = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
+      ' – ' + stripEnd.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    el.nextMonth.disabled = dateId(stripEnd) === dateId(now);
 
-    var daysInMonth = new Date(y, m + 1, 0).getDate();
     el.monthStrip.innerHTML = '';
     var loggedCount = 0;
-    for (var d = 1; d <= daysInMonth; d++) {
-      var date = new Date(y, m, d);
+    for (var i = 0; i < STRIP_DAYS; i++) {
+      var date = new Date(start.getTime() + i * dayMs);
       var id = dateId(date);
       var logged = !!(entries[id] && entries[id].text && entries[id].text.trim());
       var future = date > now;
@@ -858,7 +854,7 @@ h1.home-title {
     store.entries = {};
     store.save = function () {};
     viewingDate = todayId;
-    stripMonth = new Date();
+    stripEnd = new Date();
     showView('write');
     renderCurrent();
   }
@@ -877,8 +873,7 @@ h1.home-title {
   function doSignOut() {
     auth.signOut();
   }
-  el.signOutBtnWrite.addEventListener('click', doSignOut);
-  el.signOutBtnHome.addEventListener('click', doSignOut);
+  el.signOutBtn.addEventListener('click', doSignOut);
 
   auth.onAuthStateChanged(function (user) {
     el.bootScreen.hidden = true;
@@ -891,6 +886,8 @@ h1.home-title {
       } else {
         el.userAvatar.hidden = true;
       }
+      showView('home');
+      renderCurrent();
       firebaseBackend(user.uid);
     } else {
       resetForSignOut();
