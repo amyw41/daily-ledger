@@ -530,6 +530,14 @@ h1.home-title {
   display: flex;
   align-items: center;
   gap: 8px;
+  background: none;
+  border: 1px solid var(--paper-line);
+  border-radius: 999px;
+  padding: 4px 12px 4px 4px;
+  color: var(--ink-faint);
+  font-family: 'Public Sans', sans-serif;
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .account-chip img {
@@ -539,17 +547,7 @@ h1.home-title {
   display: block;
 }
 
-.account-chip button {
-  background: none;
-  border: none;
-  color: var(--ink-faint);
-  font-family: 'Public Sans', sans-serif;
-  font-size: 12px;
-  cursor: pointer;
-  padding: 0;
-}
-
-.account-chip button:hover { color: var(--danger); }
+.account-chip:hover { border-color: var(--danger); color: var(--danger); }
 </style>
 </head>
 <body>
@@ -573,10 +571,10 @@ h1.home-title {
     <div class="topbar-right">
       <div class="streak-chip"><span class="dot"></span><span id="streakChip">0 day streak</span></div>
       <button class="write-cta" id="writeTodayBtn">Write today &rarr;</button>
-      <div class="account-chip">
+      <button class="account-chip" id="signOutBtn">
         <img id="userAvatar" src="" alt="" referrerpolicy="no-referrer" hidden>
-        <button id="signOutBtn">Sign out</button>
-      </div>
+        <span>Sign out</span>
+      </button>
     </div>
   </div>
 
