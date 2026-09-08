@@ -1,3 +1,8 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Daily Ledger</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
@@ -404,7 +409,8 @@ h1.home-title {
   .ledger-item { grid-template-columns: 76px 1fr 44px; gap: 10px; }
 }
 </style>
-
+</head>
+<body>
 <div class="wrap">
 
   <div id="writeView">
@@ -516,12 +522,14 @@ h1.home-title {
     };
   }
 
-  if (window.claude && typeof window.claude.use === 'function') {
-    window.claude.use('db').then(function (db) {
-      if (db) dbBackend(db); else localBackend();
-    }).catch(function () { localBackend(); });
-  } else {
-    localBackend();
+  function initBackend() {
+    if (window.claude && typeof window.claude.use === 'function') {
+      window.claude.use('db').then(function (db) {
+        if (db) dbBackend(db); else localBackend();
+      }).catch(function () { localBackend(); });
+    } else {
+      localBackend();
+    }
   }
 
   // ---- derived stats ----
@@ -734,5 +742,8 @@ h1.home-title {
 
   showView('write');
   renderCurrent();
+  initBackend();
 })();
 </script>
+</body>
+</html>
