@@ -174,14 +174,14 @@ body {
   border: none;
   padding: 0;
   cursor: pointer;
-  font-size: 24px;
+  font-size: 26px;
   line-height: 1;
-  color: var(--paper-line);
+  color: var(--ink-faint);
 }
 
 .entry-star[data-starred="true"] { color: var(--flame); }
 .entry-star:not(:disabled):hover { color: var(--flame); }
-.entry-star:disabled { opacity: 0.3; cursor: default; }
+.entry-star:disabled { opacity: 0.45; cursor: default; }
 
 .month-nav {
   display: flex;
@@ -220,8 +220,7 @@ body {
 
 .month-strip {
   display: grid;
-  grid-template-columns: repeat(14, 1fr);
-  gap: 5px;
+  gap: 4px;
   margin-bottom: 28px;
   flex: 0 0 auto;
 }
@@ -233,12 +232,17 @@ body {
   background: var(--paper);
   cursor: default;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
 }
 
 .month-strip .day[data-logged="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
   cursor: pointer;
+  border-color: transparent;
 }
 
 .month-strip .day[data-selected="true"] {
@@ -247,7 +251,7 @@ body {
 }
 
 .month-strip .day[data-future="true"] {
-  background: transparent;
+  background: transparent !important;
   border-style: dashed;
   border-color: var(--paper-line);
 }
@@ -418,9 +422,9 @@ h1.home-title {
   border: none;
   padding: 0;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1;
-  color: var(--paper-line);
+  color: var(--ink-faint);
 }
 
 .ledger-item .l-star[data-starred="true"] { color: var(--flame); }
@@ -716,11 +720,10 @@ h1.home-title {
   }
 
   // ---- view state ----
-  var STRIP_DAYS = 14;
   var CONFETTI_GOAL = 500;
   var view = 'write';           // 'write' | 'home'
   var viewingDate = todayId;    // date currently shown in the write canvas
-  var stripEnd = new Date();    // last day of the 14-day window currently shown
+  var stripMonth = new Date();  // any date within the calendar month currently shown
   var typing = false;
   var prevWordCount = 0;        // for detecting when this entry crosses the confetti goal
 
@@ -776,7 +779,7 @@ h1.home-title {
 
   function openDate(id) {
     viewingDate = id;
-    stripEnd = parseId(id);
+    stripMonth = parseId(id);
     showView('write');
     renderCurrent();
     setTimeout(function () { el.box.focus(); }, 0);
@@ -786,36 +789,61 @@ h1.home-title {
   document.getElementById('writeTodayBtn').addEventListener('click', function () { openDate(todayId); });
 
   el.prevMonth.addEventListener('click', function () {
-    stripEnd = new Date(stripEnd.getTime() - STRIP_DAYS * dayMs);
+    stripMonth = new Date(stripMonth.getFullYear(), stripMonth.getMonth() - 1, 1);
     renderMonthStrip(store.entries);
   });
   el.nextMonth.addEventListener('click', function () {
-    var next = new Date(stripEnd.getTime() + STRIP_DAYS * dayMs);
-    stripEnd = next > new Date() ? new Date() : next;
+    var next = new Date(stripMonth.getFullYear(), stripMonth.getMonth() + 1, 1);
+    stripMonth = next;
     renderMonthStrip(store.entries);
   });
 
+  // interpolate between a near-white base and the accent green based on 0..1 intensity
+  function intensityColor(t) {
+    t = Math.max(0, Math.min(1, t));
+    var from = { r: 232, g: 245, b: 238 };   // --accent-soft-ish
+    var to = { r: 31, g: 138, b: 92 };       // --accent
+    var r = Math.round(from.r + (to.r - from.r) * t);
+    var g = Math.round(from.g + (to.g - from.g) * t);
+    var b = Math.round(from.b + (to.b - from.b) * t);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
   function renderMonthStrip(entries) {
     var now = new Date();
-    var start = new Date(stripEnd.getTime() - (STRIP_DAYS - 1) * dayMs);
-    el.monthLabel.textContent = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
-      ' – ' + stripEnd.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    el.nextMonth.disabled = dateId(stripEnd) === dateId(now);
+    var year = stripMonth.getFullYear();
+    var month = stripMonth.getMonth();
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
 
+    el.monthLabel.textContent = stripMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    var isCurrentMonth = (year === now.getFullYear() && month === now.getMonth());
+    el.nextMonth.disabled = isCurrentMonth;
+
+    el.monthStrip.style.gridTemplateColumns = 'repeat(' + daysInMonth + ', 1fr)';
     el.monthStrip.innerHTML = '';
     var loggedCount = 0;
-    for (var i = 0; i < STRIP_DAYS; i++) {
-      var date = new Date(start.getTime() + i * dayMs);
+    for (var day = 1; day <= daysInMonth; day++) {
+      var date = new Date(year, month, day);
       var id = dateId(date);
-      var logged = !!(entries[id] && entries[id].text && entries[id].text.trim());
+      var count = entries[id] ? wordCount(entries[id].text) : 0;
+      var logged = count > 0;
+      var hitGoal = count >= CONFETTI_GOAL;
       var future = date > now;
       if (logged) loggedCount++;
       var cell = document.createElement('div');
       cell.className = 'day';
       cell.setAttribute('data-logged', logged ? 'true' : 'false');
-      if (future) cell.setAttribute('data-future', 'true');
+      if (future) {
+        cell.setAttribute('data-future', 'true');
+      } else if (logged) {
+        cell.style.background = intensityColor(count / CONFETTI_GOAL);
+      }
+      if (hitGoal) {
+        cell.textContent = '✓';
+      }
       if (id === viewingDate) cell.setAttribute('data-selected', 'true');
-      cell.setAttribute('data-tip', date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + (logged ? ' — logged' : ''));
+      cell.setAttribute('data-tip', date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
+        (logged ? ' — ' + count + ' words' : ''));
       if (logged) {
         cell.addEventListener('click', function (id) {
           return function () { openDate(id); };
@@ -983,7 +1011,7 @@ h1.home-title {
     store.entries = {};
     store.save = function () {};
     viewingDate = todayId;
-    stripEnd = new Date();
+    stripMonth = new Date();
     showView('write');
     renderCurrent();
   }
