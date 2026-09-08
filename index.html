@@ -1,0 +1,738 @@
+<title>Daily Ledger</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  --paper: #ffffff;
+  --paper-raised: #ffffff;
+  --paper-line: #dcdedb;
+  --ink: #1b1f1c;
+  --ink-soft: #6b7069;
+  --ink-faint: #9aa09a;
+  --accent: #1f8a5c;
+  --accent-ink: #ffffff;
+  --accent-soft: #e8f5ee;
+  --flame: #2f9e63;
+  --flame-soft: #e8f5ee;
+  --danger: #b3402c;
+  --shadow: rgba(20, 24, 21, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101312;
+    --paper-raised: #171b19;
+    --paper-line: #2b302c;
+    --ink: #eef1ed;
+    --ink-soft: #9ba39c;
+    --ink-faint: #626962;
+    --accent: #45b57e;
+    --accent-ink: #08120d;
+    --accent-soft: #17281f;
+    --flame: #52c98c;
+    --flame-soft: #17281f;
+    --danger: #d97a63;
+    --shadow: rgba(0, 0, 0, 0.4);
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #101312;
+  --paper-raised: #171b19;
+  --paper-line: #2b302c;
+  --ink: #eef1ed;
+  --ink-soft: #9ba39c;
+  --ink-faint: #626962;
+  --accent: #45b57e;
+  --accent-ink: #08120d;
+  --accent-soft: #17281f;
+  --flame: #52c98c;
+  --flame-soft: #17281f;
+  --danger: #d97a63;
+  --shadow: rgba(0, 0, 0, 0.4);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: var(--paper);
+  color: var(--ink);
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+}
+
+body {
+  font-family: 'Public Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+[hidden] { display: none !important; }
+
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+.wrap {
+  max-width: 700px;
+  height: 100vh;
+  margin: 0 auto;
+  padding: 32px 28px 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#writeView, #homeView {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  flex: 0 0 auto;
+}
+
+.brand {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  color: var(--ink);
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.brand:hover { color: var(--accent); }
+
+.streak-chip {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.streak-chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--flame);
+}
+
+.write-cta {
+  font-family: 'Public Sans', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  border: 1px solid var(--paper-line);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.write-cta:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- write view ---------- */
+
+.entry-date {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 500;
+  font-size: 32px;
+  letter-spacing: -0.01em;
+  margin: 0 0 20px;
+  text-wrap: balance;
+  flex: 0 0 auto;
+}
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  flex: 0 0 auto;
+}
+
+.month-nav button {
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  line-height: 1;
+}
+
+.month-nav button:disabled { opacity: 0.35; cursor: default; }
+.month-nav button:not(:disabled):hover { color: var(--accent); }
+
+.month-nav .month-label {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.month-nav .month-count {
+  margin-left: auto;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+.month-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20px, 1fr));
+  gap: 5px;
+  margin-bottom: 28px;
+  flex: 0 0 auto;
+}
+
+.month-strip .day {
+  aspect-ratio: 1;
+  border: 1px solid var(--paper-line);
+  border-radius: 4px;
+  background: var(--paper);
+  cursor: default;
+  position: relative;
+}
+
+.month-strip .day[data-logged="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  cursor: pointer;
+}
+
+.month-strip .day[data-selected="true"] {
+  outline: 1.5px solid var(--ink);
+  outline-offset: 1.5px;
+}
+
+.month-strip .day[data-future="true"] {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--paper-line);
+}
+
+.month-strip .day:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10.5px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 5;
+  pointer-events: none;
+}
+
+textarea#entryBox {
+  display: block;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+  background: transparent;
+  color: var(--ink);
+  font-family: 'Public Sans', sans-serif;
+  font-size: 18px;
+  line-height: 1.8;
+  padding: 0;
+}
+
+textarea#entryBox::placeholder {
+  color: var(--ink-faint);
+}
+
+.canvas-foot {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  padding: 12px 0 18px;
+}
+
+.canvas-foot span {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.canvas-foot .save-status.dirty { color: var(--flame); }
+
+.tagline-foot {
+  display: none;
+}
+
+/* ---------- home view ---------- */
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--paper-line);
+  border: 1px solid var(--paper-line);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 28px;
+  flex: 0 0 auto;
+}
+
+.stat {
+  background: var(--paper);
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat .num {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.stat.streak .num { color: var(--flame); }
+.stat .num .unit { font-family: 'Public Sans', sans-serif; font-size: 12px; font-weight: 500; color: var(--ink-faint); }
+
+.stat .label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+h1.home-title {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 500;
+  font-size: 26px;
+  margin: 0 0 24px;
+  flex: 0 0 auto;
+}
+
+.section-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin: 0 0 10px;
+  flex: 0 0 auto;
+}
+
+.ledger-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 24px;
+}
+
+.ledger {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--paper-line);
+}
+
+.ledger-item {
+  display: grid;
+  grid-template-columns: 100px 1fr 60px;
+  gap: 14px;
+  padding: 15px 4px;
+  border-bottom: 1px solid var(--paper-line);
+  align-items: baseline;
+  cursor: pointer;
+}
+
+.ledger-item:hover { background: var(--accent-soft); border-radius: 6px; }
+
+.ledger-item .l-date {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.ledger-item .l-preview {
+  font-size: 14px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-item .l-words {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty-ledger {
+  color: var(--ink-faint);
+  font-size: 13.5px;
+  padding: 16px 4px;
+}
+
+.sync-note {
+  font-size: 11px;
+  color: var(--ink-faint);
+  text-align: center;
+  flex: 0 0 auto;
+  padding: 6px 0 10px;
+}
+
+@media (max-width: 480px) {
+  .ledger-item { grid-template-columns: 76px 1fr 44px; gap: 10px; }
+}
+</style>
+
+<div class="wrap">
+
+  <div id="writeView">
+    <div class="topbar">
+      <button class="brand" id="brandFromWrite">Daily Ledger</button>
+      <div class="streak-chip"><span class="dot"></span><span id="streakChip">0 day streak</span></div>
+    </div>
+
+    <h1 class="entry-date" id="entryDateHeading">&nbsp;</h1>
+
+    <div class="month-nav">
+      <button id="prevMonth" aria-label="Previous month">&#8249;</button>
+      <span class="month-label" id="monthLabel"></span>
+      <button id="nextMonth" aria-label="Next month">&#8250;</button>
+      <span class="month-count" id="monthCount"></span>
+    </div>
+    <div class="month-strip" id="monthStrip"></div>
+
+    <textarea id="entryBox" class="no-scrollbar" placeholder="Write something here…" spellcheck="true"></textarea>
+
+    <div class="canvas-foot" id="canvasFoot">
+      <span id="wordCount">0 words</span>
+      <span class="save-status" id="saveStatus">saved</span>
+    </div>
+  </div>
+
+  <div id="homeView" hidden>
+    <div class="topbar">
+      <button class="brand" id="brandFromHome">Daily Ledger</button>
+      <button class="write-cta" id="writeTodayBtn">Write today &rarr;</button>
+    </div>
+
+    <h1 class="home-title">Entries</h1>
+
+    <div class="stat-row">
+      <div class="stat streak">
+        <div class="num" id="statStreak">0<span class="unit">days</span></div>
+        <div class="label">Current streak</div>
+      </div>
+      <div class="stat">
+        <div class="num" id="statLongest">0<span class="unit">days</span></div>
+        <div class="label">Longest streak</div>
+      </div>
+      <div class="stat">
+        <div class="num" id="statTotal">0<span class="unit">entries</span></div>
+        <div class="label">Total logged</div>
+      </div>
+    </div>
+
+    <div class="section-label">All entries</div>
+    <div class="ledger-scroll no-scrollbar">
+      <div class="ledger" id="ledgerFull"></div>
+    </div>
+  </div>
+
+  <div class="sync-note" id="syncNote"></div>
+</div>
+
+<script>
+(function () {
+  var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+  var dateId = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+  var parseId = function (id) { return new Date(id + 'T00:00:00'); };
+  var todayId = dateId(new Date());
+  var dayMs = 86400000;
+
+  var wordCount = function (text) {
+    var t = (text || '').trim();
+    if (!t) return 0;
+    return t.split(/\s+/).filter(Boolean).length;
+  };
+
+  // ---- storage backend: db capability, falling back to localStorage ----
+  var store = { entries: {}, ready: false, save: function () {} };
+
+  function localBackend() {
+    var KEY = 'daily-ledger-entries-v1';
+    try {
+      var raw = localStorage.getItem(KEY);
+      store.entries = raw ? JSON.parse(raw) : {};
+    } catch (e) { store.entries = {}; }
+    store.ready = true;
+    store.save = function (id, entry) {
+      store.entries[id] = entry;
+      try { localStorage.setItem(KEY, JSON.stringify(store.entries)); } catch (e) {}
+      return Promise.resolve();
+    };
+    document.getElementById('syncNote').textContent = 'Saved on this device only.';
+    renderCurrent();
+  }
+
+  function dbBackend(db) {
+    var col = db.collection('entries');
+    document.getElementById('syncNote').textContent = 'Synced.';
+    col.orderBy('date', 'desc').limit(400).onSnapshot(function (snap) {
+      var map = {};
+      snap.docs.forEach(function (doc) {
+        var data = doc.data();
+        if (data && data.text) map[doc.id] = data;
+      });
+      store.entries = map;
+      store.ready = true;
+      renderCurrent();
+    }, function () {
+      localBackend();
+    });
+    store.save = function (id, entry) {
+      return col.doc(id).set(entry);
+    };
+  }
+
+  if (window.claude && typeof window.claude.use === 'function') {
+    window.claude.use('db').then(function (db) {
+      if (db) dbBackend(db); else localBackend();
+    }).catch(function () { localBackend(); });
+  } else {
+    localBackend();
+  }
+
+  // ---- derived stats ----
+  function computeStreaks(entries) {
+    var has = function (id) { return !!(entries[id] && entries[id].text && entries[id].text.trim()); };
+    var cursor = new Date();
+    if (!has(todayId)) cursor = new Date(cursor.getTime() - dayMs);
+    var current = 0;
+    while (has(dateId(cursor))) {
+      current++;
+      cursor = new Date(cursor.getTime() - dayMs);
+    }
+    var ids = Object.keys(entries).filter(has).sort();
+    var longest = 0, run = 0, prev = null;
+    ids.forEach(function (id) {
+      var d = parseId(id);
+      if (prev && (d - prev) === dayMs) run++; else run = 1;
+      longest = Math.max(longest, run);
+      prev = d;
+    });
+    return { current: current, longest: longest, total: ids.length };
+  }
+
+  // ---- view state ----
+  var view = 'write';           // 'write' | 'home'
+  var viewingDate = todayId;    // date currently shown in the write canvas
+  var stripMonth = new Date();  // month currently shown in the month strip
+  var typing = false;
+
+  var el = {
+    writeView: document.getElementById('writeView'),
+    homeView: document.getElementById('homeView'),
+    entryDateHeading: document.getElementById('entryDateHeading'),
+    monthLabel: document.getElementById('monthLabel'),
+    monthCount: document.getElementById('monthCount'),
+    monthStrip: document.getElementById('monthStrip'),
+    prevMonth: document.getElementById('prevMonth'),
+    nextMonth: document.getElementById('nextMonth'),
+    box: document.getElementById('entryBox'),
+    wordCount: document.getElementById('wordCount'),
+    saveStatus: document.getElementById('saveStatus'),
+    streakChip: document.getElementById('streakChip'),
+    statStreak: document.getElementById('statStreak'),
+    statLongest: document.getElementById('statLongest'),
+    statTotal: document.getElementById('statTotal'),
+    ledgerFull: document.getElementById('ledgerFull'),
+    canvasFoot: document.getElementById('canvasFoot')
+  };
+
+  function showView(next) {
+    view = next;
+    el.writeView.hidden = view !== 'write';
+    el.homeView.hidden = view !== 'home';
+  }
+
+  function openDate(id) {
+    viewingDate = id;
+    stripMonth = parseId(id);
+    showView('write');
+    renderCurrent();
+    setTimeout(function () { el.box.focus(); }, 0);
+  }
+
+  document.getElementById('brandFromWrite').addEventListener('click', function () { showView('home'); renderCurrent(); });
+  document.getElementById('brandFromHome').addEventListener('click', function () { openDate(todayId); });
+  document.getElementById('writeTodayBtn').addEventListener('click', function () { openDate(todayId); });
+
+  el.prevMonth.addEventListener('click', function () {
+    stripMonth = new Date(stripMonth.getFullYear(), stripMonth.getMonth() - 1, 1);
+    renderMonthStrip(store.entries);
+  });
+  el.nextMonth.addEventListener('click', function () {
+    var next = new Date(stripMonth.getFullYear(), stripMonth.getMonth() + 1, 1);
+    if (next > new Date()) return;
+    stripMonth = next;
+    renderMonthStrip(store.entries);
+  });
+
+  function renderMonthStrip(entries) {
+    var y = stripMonth.getFullYear(), m = stripMonth.getMonth();
+    el.monthLabel.textContent = stripMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    var now = new Date();
+    var isCurrentMonth = (y === now.getFullYear() && m === now.getMonth());
+    el.nextMonth.disabled = isCurrentMonth;
+
+    var daysInMonth = new Date(y, m + 1, 0).getDate();
+    el.monthStrip.innerHTML = '';
+    var loggedCount = 0;
+    for (var d = 1; d <= daysInMonth; d++) {
+      var date = new Date(y, m, d);
+      var id = dateId(date);
+      var logged = !!(entries[id] && entries[id].text && entries[id].text.trim());
+      var future = date > now;
+      if (logged) loggedCount++;
+      var cell = document.createElement('div');
+      cell.className = 'day';
+      cell.setAttribute('data-logged', logged ? 'true' : 'false');
+      if (future) cell.setAttribute('data-future', 'true');
+      if (id === viewingDate) cell.setAttribute('data-selected', 'true');
+      cell.setAttribute('data-tip', date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + (logged ? ' — logged' : ''));
+      if (logged) {
+        cell.addEventListener('click', function (id) {
+          return function () { openDate(id); };
+        }(id));
+      }
+      el.monthStrip.appendChild(cell);
+    }
+    el.monthCount.textContent = loggedCount + (loggedCount === 1 ? ' day logged' : ' days logged');
+  }
+
+  function renderLedger(entries) {
+    el.ledgerFull.innerHTML = '';
+    var ids = Object.keys(entries).filter(function (id) { return entries[id].text && entries[id].text.trim(); }).sort().reverse();
+    if (!ids.length) {
+      var empty = document.createElement('div');
+      empty.className = 'empty-ledger';
+      empty.textContent = 'No entries yet — write today’s and it’ll show up here.';
+      el.ledgerFull.appendChild(empty);
+      return;
+    }
+    ids.forEach(function (id) {
+      var entry = entries[id];
+      var row = document.createElement('div');
+      row.className = 'ledger-item';
+      var d = parseId(id);
+      row.innerHTML =
+        '<span class="l-date">' + d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' }) + '</span>' +
+        '<span class="l-preview"></span>' +
+        '<span class="l-words">' + wordCount(entry.text) + ' wd</span>';
+      row.querySelector('.l-preview').textContent = entry.text;
+      row.addEventListener('click', function () { openDate(id); });
+      el.ledgerFull.appendChild(row);
+    });
+  }
+
+  function updateWordAndStatus() {
+    el.wordCount.textContent = wordCount(el.box.value) + ' words';
+  }
+
+  function setSaveStatus(state) {
+    el.saveStatus.classList.remove('dirty');
+    if (state === 'dirty') { el.saveStatus.textContent = 'unsaved'; el.saveStatus.classList.add('dirty'); }
+    else if (state === 'saving') { el.saveStatus.textContent = 'saving…'; }
+    else { el.saveStatus.textContent = 'saved'; }
+  }
+
+  function renderCurrent() {
+    var entries = store.entries;
+    var streaks = computeStreaks(entries);
+    el.streakChip.textContent = streaks.current + (streaks.current === 1 ? ' day streak' : ' day streak');
+    el.statStreak.innerHTML = streaks.current + '<span class="unit">days</span>';
+    el.statLongest.innerHTML = streaks.longest + '<span class="unit">days</span>';
+    el.statTotal.innerHTML = streaks.total + '<span class="unit">entries</span>';
+
+    if (view === 'home') {
+      renderLedger(entries);
+      return;
+    }
+
+    // write view
+    var d = parseId(viewingDate);
+    el.entryDateHeading.textContent = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) + (viewingDate === todayId ? '' : '');
+    renderMonthStrip(entries);
+    if (!typing) {
+      el.box.value = (entries[viewingDate] && entries[viewingDate].text) || '';
+    }
+    updateWordAndStatus();
+    setSaveStatus('saved');
+  }
+
+  var saveTimer = null;
+  function scheduleSave() {
+    setSaveStatus('dirty');
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(doSave, 1200);
+  }
+
+  function doSave() {
+    var text = el.box.value;
+    var existing = store.entries[viewingDate] || {};
+    if (!text.trim() && !existing.text) { setSaveStatus('saved'); return; }
+    setSaveStatus('saving');
+    var entry = {
+      date: viewingDate,
+      text: text,
+      wordCount: wordCount(text),
+      createdAt: existing.createdAt || Date.now(),
+      updatedAt: Date.now()
+    };
+    Promise.resolve(store.save(viewingDate, entry)).then(function () {
+      store.entries[viewingDate] = entry;
+      typing = false;
+      setSaveStatus('saved');
+      renderMonthStrip(store.entries);
+    }).catch(function () {
+      setSaveStatus('dirty');
+    });
+  }
+
+  el.box.addEventListener('input', function () {
+    typing = true;
+    updateWordAndStatus();
+    scheduleSave();
+  });
+
+  el.box.addEventListener('blur', function () {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    doSave();
+  });
+
+  showView('write');
+  renderCurrent();
+})();
+</script>
