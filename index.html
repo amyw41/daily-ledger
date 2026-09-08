@@ -408,15 +408,119 @@ h1.home-title {
 @media (max-width: 480px) {
   .ledger-item { grid-template-columns: 76px 1fr 44px; gap: 10px; }
 }
+
+/* ---------- boot / login screens ---------- */
+
+#bootScreen {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+#loginScreen {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 24px;
+  text-align: center;
+}
+
+#loginScreen .login-brand {
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600;
+  font-size: 26px;
+}
+
+#loginScreen .login-tagline {
+  color: var(--ink-soft);
+  font-size: 14.5px;
+  max-width: 320px;
+  margin: -16px 0 0;
+}
+
+.google-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Public Sans', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  padding: 11px 20px;
+  cursor: pointer;
+}
+
+.google-btn:hover { border-color: var(--accent); }
+.google-btn:disabled { opacity: 0.5; cursor: default; }
+
+#loginError {
+  color: var(--danger);
+  font-size: 12.5px;
+  max-width: 320px;
+}
+
+.account-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.account-chip img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: block;
+}
+
+.account-chip button {
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  font-family: 'Public Sans', sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.account-chip button:hover { color: var(--danger); }
 </style>
 </head>
 <body>
-<div class="wrap">
+
+<div id="bootScreen">Loading…</div>
+
+<div id="loginScreen" hidden>
+  <div class="login-brand">500 Words Daily</div>
+  <p class="login-tagline">One entry a day. Sign in to keep your own private streak.</p>
+  <button class="google-btn" id="googleSignInBtn">
+    <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 01-1.8 2.72v2.26h2.9c1.7-1.56 2.7-3.87 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.98v2.33A9 9 0 009 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 013.68 9c0-.59.1-1.17.27-1.7V4.97H.98A9 9 0 000 9c0 1.45.35 2.83.98 4.03l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 00.98 4.97l2.97 2.33C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+    Sign in with Google
+  </button>
+  <p id="loginError" hidden></p>
+</div>
+
+<div class="wrap" id="appWrap" hidden>
 
   <div id="writeView">
     <div class="topbar">
       <button class="brand" id="brandFromWrite">500 Words Daily</button>
-      <div class="streak-chip"><span class="dot"></span><span id="streakChip">0 day streak</span></div>
+      <div style="display:flex; align-items:center; gap:16px;">
+        <div class="streak-chip"><span class="dot"></span><span id="streakChip">0 day streak</span></div>
+        <div class="account-chip">
+          <img id="userAvatar" src="" alt="" hidden>
+          <button id="signOutBtnWrite">Sign out</button>
+        </div>
+      </div>
     </div>
 
     <h1 class="entry-date" id="entryDateHeading">&nbsp;</h1>
@@ -440,7 +544,12 @@ h1.home-title {
   <div id="homeView" hidden>
     <div class="topbar">
       <button class="brand" id="brandFromHome">500 Words Daily</button>
-      <button class="write-cta" id="writeTodayBtn">Write today &rarr;</button>
+      <div style="display:flex; align-items:center; gap:16px;">
+        <button class="write-cta" id="writeTodayBtn">Write today &rarr;</button>
+        <div class="account-chip">
+          <button id="signOutBtnHome">Sign out</button>
+        </div>
+      </div>
     </div>
 
     <h1 class="home-title">Entries</h1>
@@ -469,8 +578,20 @@ h1.home-title {
   <div class="sync-note" id="syncNote"></div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+
 <script>
 (function () {
+  var firebaseConfig = {
+    apiKey: "AIzaSyCJgNoGWp2YbGHkNC2z_C3ZrH5IDelskmo",
+    authDomain: "wordsdaily-ceb61.firebaseapp.com",
+    projectId: "wordsdaily-ceb61",
+    storageBucket: "wordsdaily-ceb61.firebasestorage.app",
+    messagingSenderId: "82709653383",
+    appId: "1:82709653383:web:97c4fcf14ed7c7cc2f9522"
+  };
   var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
   var dateId = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
   var parseId = function (id) { return new Date(id + 'T00:00:00'); };
@@ -483,29 +604,15 @@ h1.home-title {
     return t.split(/\s+/).filter(Boolean).length;
   };
 
-  // ---- storage backend: db capability, falling back to localStorage ----
+  // ---- storage backend: one Firestore collection per signed-in account ----
   var store = { entries: {}, ready: false, save: function () {} };
+  var unsubscribeEntries = null;
 
-  function localBackend() {
-    var KEY = 'daily-ledger-entries-v1';
-    try {
-      var raw = localStorage.getItem(KEY);
-      store.entries = raw ? JSON.parse(raw) : {};
-    } catch (e) { store.entries = {}; }
-    store.ready = true;
-    store.save = function (id, entry) {
-      store.entries[id] = entry;
-      try { localStorage.setItem(KEY, JSON.stringify(store.entries)); } catch (e) {}
-      return Promise.resolve();
-    };
-    document.getElementById('syncNote').textContent = 'Saved on this device only.';
-    renderCurrent();
-  }
-
-  function dbBackend(db) {
-    var col = db.collection('entries');
-    document.getElementById('syncNote').textContent = 'Synced.';
-    col.orderBy('date', 'desc').limit(400).onSnapshot(function (snap) {
+  function firebaseBackend(uid) {
+    if (unsubscribeEntries) { unsubscribeEntries(); unsubscribeEntries = null; }
+    var col = firebase.firestore().collection('users').doc(uid).collection('entries');
+    document.getElementById('syncNote').textContent = 'Synced to your account.';
+    unsubscribeEntries = col.orderBy('date', 'desc').limit(400).onSnapshot(function (snap) {
       var map = {};
       snap.docs.forEach(function (doc) {
         var data = doc.data();
@@ -514,22 +621,12 @@ h1.home-title {
       store.entries = map;
       store.ready = true;
       renderCurrent();
-    }, function () {
-      localBackend();
+    }, function (err) {
+      document.getElementById('syncNote').textContent = 'Could not sync: ' + err.message;
     });
     store.save = function (id, entry) {
       return col.doc(id).set(entry);
     };
-  }
-
-  function initBackend() {
-    if (window.claude && typeof window.claude.use === 'function') {
-      window.claude.use('db').then(function (db) {
-        if (db) dbBackend(db); else localBackend();
-      }).catch(function () { localBackend(); });
-    } else {
-      localBackend();
-    }
   }
 
   // ---- derived stats ----
@@ -576,7 +673,15 @@ h1.home-title {
     statLongest: document.getElementById('statLongest'),
     statTotal: document.getElementById('statTotal'),
     ledgerFull: document.getElementById('ledgerFull'),
-    canvasFoot: document.getElementById('canvasFoot')
+    canvasFoot: document.getElementById('canvasFoot'),
+    bootScreen: document.getElementById('bootScreen'),
+    loginScreen: document.getElementById('loginScreen'),
+    appWrap: document.getElementById('appWrap'),
+    googleSignInBtn: document.getElementById('googleSignInBtn'),
+    loginError: document.getElementById('loginError'),
+    userAvatar: document.getElementById('userAvatar'),
+    signOutBtnWrite: document.getElementById('signOutBtnWrite'),
+    signOutBtnHome: document.getElementById('signOutBtnHome')
   };
 
   function showView(next) {
@@ -742,7 +847,57 @@ h1.home-title {
 
   showView('write');
   renderCurrent();
-  initBackend();
+
+  // ---- auth ----
+  firebase.initializeApp(firebaseConfig);
+  var auth = firebase.auth();
+  var provider = new firebase.auth.GoogleAuthProvider();
+
+  function resetForSignOut() {
+    if (unsubscribeEntries) { unsubscribeEntries(); unsubscribeEntries = null; }
+    store.entries = {};
+    store.save = function () {};
+    viewingDate = todayId;
+    stripMonth = new Date();
+    showView('write');
+    renderCurrent();
+  }
+
+  el.googleSignInBtn.addEventListener('click', function () {
+    el.googleSignInBtn.disabled = true;
+    el.loginError.hidden = true;
+    auth.signInWithPopup(provider).catch(function (err) {
+      el.loginError.textContent = 'Sign-in failed: ' + err.message;
+      el.loginError.hidden = false;
+    }).finally(function () {
+      el.googleSignInBtn.disabled = false;
+    });
+  });
+
+  function doSignOut() {
+    auth.signOut();
+  }
+  el.signOutBtnWrite.addEventListener('click', doSignOut);
+  el.signOutBtnHome.addEventListener('click', doSignOut);
+
+  auth.onAuthStateChanged(function (user) {
+    el.bootScreen.hidden = true;
+    if (user) {
+      el.loginScreen.hidden = true;
+      el.appWrap.hidden = false;
+      if (user.photoURL) {
+        el.userAvatar.src = user.photoURL;
+        el.userAvatar.hidden = false;
+      } else {
+        el.userAvatar.hidden = true;
+      }
+      firebaseBackend(user.uid);
+    } else {
+      resetForSignOut();
+      el.appWrap.hidden = true;
+      el.loginScreen.hidden = false;
+    }
+  });
 })();
 </script>
 </body>
