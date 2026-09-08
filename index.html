@@ -354,6 +354,19 @@ h1.home-title {
   flex: 0 0 auto;
 }
 
+.sort-select {
+  font-family: 'Public Sans', sans-serif;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--paper-line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
 .ledger-scroll {
   flex: 1;
   min-height: 0;
@@ -369,7 +382,7 @@ h1.home-title {
 
 .ledger-item {
   display: grid;
-  grid-template-columns: 100px 1fr 60px;
+  grid-template-columns: 22px 100px 1fr 60px;
   gap: 14px;
   padding: 15px 4px;
   border-bottom: 1px solid var(--paper-line);
@@ -378,6 +391,19 @@ h1.home-title {
 }
 
 .ledger-item:hover { background: var(--accent-soft); border-radius: 6px; }
+
+.ledger-item .l-star {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--paper-line);
+}
+
+.ledger-item .l-star[data-starred="true"] { color: var(--flame); }
+.ledger-item .l-star:hover { color: var(--flame); }
 
 .ledger-item .l-date {
   font-family: 'IBM Plex Mono', monospace;
@@ -416,7 +442,7 @@ h1.home-title {
 }
 
 @media (max-width: 480px) {
-  .ledger-item { grid-template-columns: 76px 1fr 44px; gap: 10px; }
+  .ledger-item { grid-template-columns: 18px 76px 1fr 44px; gap: 10px; }
 }
 
 /* ---------- boot / login screens ---------- */
@@ -576,7 +602,15 @@ h1.home-title {
       </div>
     </div>
 
-    <div class="section-label">All entries</div>
+    <div class="section-label" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>All entries</span>
+      <select id="sortSelect" class="sort-select">
+        <option value="date-desc">Newest first</option>
+        <option value="date-asc">Oldest first</option>
+        <option value="words-desc">Most words</option>
+        <option value="words-asc">Fewest words</option>
+      </select>
+    </div>
     <div class="ledger-scroll no-scrollbar">
       <div class="ledger" id="ledgerFull"></div>
     </div>
@@ -588,6 +622,7 @@ h1.home-title {
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 
 <script>
 (function () {
@@ -660,10 +695,21 @@ h1.home-title {
 
   // ---- view state ----
   var STRIP_DAYS = 14;
+  var CONFETTI_GOAL = 500;
   var view = 'write';           // 'write' | 'home'
   var viewingDate = todayId;    // date currently shown in the write canvas
   var stripEnd = new Date();    // last day of the 14-day window currently shown
   var typing = false;
+  var prevWordCount = 0;        // for detecting when this entry crosses the confetti goal
+
+  function fireConfetti() {
+    if (typeof confetti !== 'function') return;
+    var end = Date.now() + 1800;
+    (function frame() {
+      confetti({ particleCount: 4, startVelocity: 35, spread: 80, ticks: 200, origin: { x: Math.random(), y: -0.1 } });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    })();
+  }
 
   var el = {
     writeView: document.getElementById('writeView'),
@@ -690,8 +736,14 @@ h1.home-title {
     googleSignInBtn: document.getElementById('googleSignInBtn'),
     loginError: document.getElementById('loginError'),
     userAvatar: document.getElementById('userAvatar'),
-    signOutBtn: document.getElementById('signOutBtn')
+    signOutBtn: document.getElementById('signOutBtn'),
+    sortSelect: document.getElementById('sortSelect')
   };
+
+  el.sortSelect.addEventListener('change', function () {
+    sortMode = el.sortSelect.value;
+    renderLedger(store.entries);
+  });
 
   function showView(next) {
     view = next;
@@ -751,26 +803,55 @@ h1.home-title {
     el.monthCount.textContent = loggedCount + (loggedCount === 1 ? ' day logged' : ' days logged');
   }
 
+  var sortMode = 'date-desc';
+
+  function sortIds(ids, entries, mode) {
+    var cmp;
+    if (mode === 'date-asc') cmp = function (a, b) { return a < b ? -1 : a > b ? 1 : 0; };
+    else if (mode === 'words-desc') cmp = function (a, b) { return wordCount(entries[b].text) - wordCount(entries[a].text); };
+    else if (mode === 'words-asc') cmp = function (a, b) { return wordCount(entries[a].text) - wordCount(entries[b].text); };
+    else cmp = function (a, b) { return a < b ? 1 : a > b ? -1 : 0; }; // date-desc, default
+    return ids.slice().sort(cmp);
+  }
+
+  function toggleStar(id) {
+    var existing = store.entries[id];
+    if (!existing) return;
+    var updated = Object.assign({}, existing, { starred: !existing.starred });
+    store.save(id, updated).then(function () {
+      store.entries[id] = updated;
+      renderCurrent();
+    });
+  }
+
   function renderLedger(entries) {
     el.ledgerFull.innerHTML = '';
-    var ids = Object.keys(entries).filter(function (id) { return entries[id].text && entries[id].text.trim(); }).sort().reverse();
-    if (!ids.length) {
+    var allIds = Object.keys(entries).filter(function (id) { return entries[id].text && entries[id].text.trim(); });
+    if (!allIds.length) {
       var empty = document.createElement('div');
       empty.className = 'empty-ledger';
       empty.textContent = 'No entries yet — write today’s and it’ll show up here.';
       el.ledgerFull.appendChild(empty);
       return;
     }
+    var starredIds = sortIds(allIds.filter(function (id) { return entries[id].starred; }), entries, sortMode);
+    var restIds = sortIds(allIds.filter(function (id) { return !entries[id].starred; }), entries, sortMode);
+    var ids = starredIds.concat(restIds);
     ids.forEach(function (id) {
       var entry = entries[id];
       var row = document.createElement('div');
       row.className = 'ledger-item';
       var d = parseId(id);
       row.innerHTML =
+        '<button class="l-star" data-starred="' + (entry.starred ? 'true' : 'false') + '" aria-label="Star this entry">' + (entry.starred ? '★' : '☆') + '</button>' +
         '<span class="l-date">' + d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' }) + '</span>' +
         '<span class="l-preview"></span>' +
         '<span class="l-words">' + wordCount(entry.text) + ' wd</span>';
       row.querySelector('.l-preview').textContent = entry.text;
+      row.querySelector('.l-star').addEventListener('click', function (e) {
+        e.stopPropagation();
+        toggleStar(id);
+      });
       row.addEventListener('click', function () { openDate(id); });
       el.ledgerFull.appendChild(row);
     });
@@ -807,6 +888,7 @@ h1.home-title {
     renderMonthStrip(entries);
     if (!typing) {
       el.box.value = (entries[viewingDate] && entries[viewingDate].text) || '';
+      prevWordCount = wordCount(el.box.value);
     }
     updateWordAndStatus();
     setSaveStatus('saved');
@@ -824,13 +906,13 @@ h1.home-title {
     var existing = store.entries[viewingDate] || {};
     if (!text.trim() && !existing.text) { setSaveStatus('saved'); return; }
     setSaveStatus('saving');
-    var entry = {
+    var entry = Object.assign({}, existing, {
       date: viewingDate,
       text: text,
       wordCount: wordCount(text),
       createdAt: existing.createdAt || Date.now(),
       updatedAt: Date.now()
-    };
+    });
     Promise.resolve(store.save(viewingDate, entry)).then(function () {
       store.entries[viewingDate] = entry;
       typing = false;
@@ -843,6 +925,9 @@ h1.home-title {
 
   el.box.addEventListener('input', function () {
     typing = true;
+    var newCount = wordCount(el.box.value);
+    if (prevWordCount < CONFETTI_GOAL && newCount >= CONFETTI_GOAL) fireConfetti();
+    prevWordCount = newCount;
     updateWordAndStatus();
     scheduleSave();
   });
