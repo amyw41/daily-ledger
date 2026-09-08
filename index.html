@@ -152,15 +152,36 @@ body {
 
 /* ---------- write view ---------- */
 
+.entry-date-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 20px;
+  flex: 0 0 auto;
+}
+
 .entry-date {
   font-family: 'Fraunces', Georgia, serif;
   font-weight: 500;
   font-size: 32px;
   letter-spacing: -0.01em;
-  margin: 0 0 20px;
+  margin: 0;
   text-wrap: balance;
-  flex: 0 0 auto;
 }
+
+.entry-star {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--paper-line);
+}
+
+.entry-star[data-starred="true"] { color: var(--flame); }
+.entry-star:not(:disabled):hover { color: var(--flame); }
+.entry-star:disabled { opacity: 0.3; cursor: default; }
 
 .month-nav {
   display: flex;
@@ -561,7 +582,10 @@ h1.home-title {
 
   <div id="writeView">
 
-    <h1 class="entry-date" id="entryDateHeading">&nbsp;</h1>
+    <div class="entry-date-row">
+      <h1 class="entry-date" id="entryDateHeading">&nbsp;</h1>
+      <button class="entry-star" id="entryStarBtn" aria-label="Star this entry">☆</button>
+    </div>
 
     <div class="month-nav">
       <button id="prevMonth" aria-label="Previous month">&#8249;</button>
@@ -715,6 +739,7 @@ h1.home-title {
     writeView: document.getElementById('writeView'),
     homeView: document.getElementById('homeView'),
     entryDateHeading: document.getElementById('entryDateHeading'),
+    entryStarBtn: document.getElementById('entryStarBtn'),
     monthLabel: document.getElementById('monthLabel'),
     monthCount: document.getElementById('monthCount'),
     monthStrip: document.getElementById('monthStrip'),
@@ -885,6 +910,12 @@ h1.home-title {
     // write view
     var d = parseId(viewingDate);
     el.entryDateHeading.textContent = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) + (viewingDate === todayId ? '' : '');
+    var currentEntry = entries[viewingDate];
+    var hasText = !!(currentEntry && currentEntry.text && currentEntry.text.trim());
+    el.entryStarBtn.disabled = !hasText;
+    el.entryStarBtn.setAttribute('data-starred', hasText && currentEntry.starred ? 'true' : 'false');
+    el.entryStarBtn.textContent = hasText && currentEntry.starred ? '★' : '☆';
+    el.entryStarBtn.title = hasText ? (currentEntry.starred ? 'Unstar this entry' : 'Star this entry') : 'Save an entry to star it';
     renderMonthStrip(entries);
     if (!typing) {
       el.box.value = (entries[viewingDate] && entries[viewingDate].text) || '';
@@ -922,6 +953,10 @@ h1.home-title {
       setSaveStatus('dirty');
     });
   }
+
+  el.entryStarBtn.addEventListener('click', function () {
+    if (!el.entryStarBtn.disabled) toggleStar(viewingDate);
+  });
 
   el.box.addEventListener('input', function () {
     typing = true;
